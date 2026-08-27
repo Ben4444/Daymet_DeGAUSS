@@ -1,0 +1,8 @@
+Latitude: 34.0739  Longitude: -118.24
+X & Y on Lambert Conformal Conic: -1612674.87 -718936.29
+Tile: 11191
+Elevation: 150 meters
+All years; all variables; Daymet Software Version 4.0
+How to cite: Thornton; M.M.; R. Shrestha; Y. Wei; P.E. Thornton; S-C. Kao; and B.E. Wilson. 2022. Daymet: Daily Surface Weather Data on a 1-km Grid for North America; Version 4 R1. ORNL DAAC; Oak Ridge; Tennessee; USA. https://doi.org/10.3334/ORNLDAAC/2129
+year,yday,dayl (s),prcp (mm/day),srad (W/m^2),swe (kg/m^2),tmax (deg c),tmin (deg c),vp (Pa)
+1990,62,40738.00,0.00,265.39,0.00,18.93,10.80,1294.75

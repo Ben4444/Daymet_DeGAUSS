@@ -1,0 +1,1 @@
+docker run -e USER="my_username" -e PASSWORD="my_password" --rm -v %cd%:/tmp ghcr.io/degauss-org/daymet:1.0.0 noaa_stations.csv --vars=tmax,tmin --delete_daymet

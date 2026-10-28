@@ -1,5 +1,5 @@
 ---
-title: "daymet_narr_noaa_validation"
+title: "daymet_narr_gridmet_noaa_validation"
 author: "Ben Barrett"
 date: last-modified
 date-format: long
@@ -7,7 +7,7 @@ format: html
 editor: visual
 ---
 
-**Comparing the Daymet and NOAA station, and NARR and NOAA station, daily measures for average temperature (TAVG) at the three NOAA stations in Chicago over 2017-2024.**
+**Comparing the Daymet and NOAA station, NARR and NOAA station, and gridMET and NOAA station daily measures for average temperature (TAVG) at the three NOAA stations in Chicago over 2017-2024.**
 
 ```{r}
 #| echo: false
@@ -20,9 +20,10 @@ library(blandr)
 library(tmap)
 library(sf)
 library(janitor)
+library(patchwork)
 
-# Importing the NOAA station, Daymet, and NARR temperature data
-noaa_stations_daymet_narr <- read_csv("noaa_stations_daymet_narr.csv")
+# Importing the NOAA station, Daymet, NARR, and gridMET temperature data
+noaa_stations_daymet_narr_gridmet <- read_csv("noaa_stations_daymet_narr_gridmet.csv")
 ```
 
 **Map of Chicago NOAA station observation sites.**
@@ -72,7 +73,7 @@ tm_shape(chicago) +
 
 ```{r}
 #| echo: false
-station_count <- noaa_stations_daymet_narr %>%
+station_count <- noaa_stations_daymet_narr_gridmet %>%
   group_by(name, year(date)) %>%
   count() %>%
   rename(year = `year(date)`)
@@ -84,25 +85,29 @@ station_count <- station_count %>%
 print(station_count, n = 27)
 ```
 
-**Violin plot of NOAA, Daymet, and NARR daily average temperature distributions.**
+**Violin plot of NOAA, Daymet, NARR, and gridMET daily average temperature distributions.**
 
 ```{r}
 #| echo: false
-violin_data_noaa <- noaa_stations_daymet_narr %>%
+violin_data_noaa <- noaa_stations_daymet_narr_gridmet %>%
   select(tavg_noaa) %>%
   rename(tavg = tavg_noaa) %>%
   mutate(Data = "NOAA")
-violin_data_daymet <- noaa_stations_daymet_narr %>%
+violin_data_daymet <- noaa_stations_daymet_narr_gridmet %>%
   select(tavg_daymet) %>%
   rename(tavg = tavg_daymet) %>%
   mutate(Data = "Daymet")
-violin_data_narr <- noaa_stations_daymet_narr %>%
+violin_data_narr <- noaa_stations_daymet_narr_gridmet %>%
   select(tavg_narr) %>%
   rename(tavg = tavg_narr) %>%
   mutate(Data = "NARR")
-violin_data <- rbind(violin_data_noaa, violin_data_daymet, violin_data_narr)
+violin_data_gridmet <- noaa_stations_daymet_narr_gridmet %>%
+  select(tavg_gridmet) %>%
+  rename(tavg = tavg_gridmet) %>%
+  mutate(Data = "gridMET")
+violin_data <- rbind(violin_data_noaa, violin_data_daymet, violin_data_narr, violin_data_gridmet)
 violin_data <- violin_data %>%
-  mutate(Data = fct_relevel(Data, "Daymet", "NOAA", "NARR"))
+  mutate(Data = fct_relevel(Data, "NOAA", "Daymet", "NARR", "gridMET"))
 
 ggplot(violin_data, aes(x = Data, y = tavg)) +
   geom_violin(trim = TRUE) +
@@ -118,7 +123,7 @@ ggplot(violin_data, aes(x = Data, y = tavg)) +
 
 ```{r}
 #| echo: true
-ks.test(noaa_stations_daymet_narr$tavg_daymet, noaa_stations_daymet_narr$tavg_noaa, alternative = "two.sided", exact = TRUE)
+ks.test(noaa_stations_daymet_narr_gridmet$tavg_daymet, noaa_stations_daymet_narr_gridmet$tavg_noaa, alternative = "two.sided", exact = TRUE)
 ```
 
 The p-value is not statistically significant (p = 0.10) and so the null hypothesis that Daymet and NOAA were drawn from the same distribution is not rejected.
@@ -127,25 +132,60 @@ The p-value is not statistically significant (p = 0.10) and so the null hypothes
 
 ```{r}
 #| echo: true
-ks.test(noaa_stations_daymet_narr$tavg_narr, noaa_stations_daymet_narr$tavg_noaa, alternative = "two.sided", exact = TRUE)
+ks.test(noaa_stations_daymet_narr_gridmet$tavg_narr, noaa_stations_daymet_narr_gridmet$tavg_noaa, alternative = "two.sided", exact = TRUE)
 ```
 
 The p-value is statistically significant (p \< 0.01) and so the null hypothesis that NARR and NOAA were drawn from the same distribution is rejected.
 
-**Scatterplot for Daymet vs. NOAA daily average temperature.**
+**Two-sample Kolmogorov-Smirnov test for gridMET vs. NOAA daily average temperature.**
+
+```{r}
+#| echo: true
+ks.test(noaa_stations_daymet_narr_gridmet$tavg_gridmet, noaa_stations_daymet_narr_gridmet$tavg_noaa, alternative = "two.sided", exact = TRUE)
+```
+
+The p-value is not statistically significant (p = 0.81) and so the null hypothesis that gridMET and NOAA were drawn from the same distribution is not rejected.
+
+**Scatterplots for Daymet vs. NOAA daily average temperature, NARR vs. NOAA daily average temperature, and gridMET vs. NOAA daily average temperature.**
 
 ```{r}
 #| echo: false
-ggplot(noaa_stations_daymet_narr, aes(x = tavg_noaa, y = tavg_daymet)) +
+# Daymet vs. NOAA
+sp_daymet <- ggplot(noaa_stations_daymet_narr_gridmet, aes(x = tavg_noaa, y = tavg_daymet)) +
+  geom_point(size = 0.75) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "blue") +
+  xlab("") +
+  ylab("Daymet Daily Average Temperature (Celsius)") +
+  scale_x_continuous(limits = c(-30, 35), breaks = seq(-30, 35, by = 5), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(-30, 35), breaks = seq(-30, 35, by = 5), expand = c(0, 0)) +
+  stat_cor(method = "pearson", label.x = -28, r.digits = 3, p.accuracy = 0.01) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+# NARR vs. NOAA
+sp_narr <- ggplot(noaa_stations_daymet_narr_gridmet, aes(x = tavg_noaa, y = tavg_narr)) +
   geom_point(size = 0.75) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "blue") +
   xlab("NOAA Daily Average Temperature (Celsius)") +
-  ylab("Daymet Daily Average Temperature (Celsius)") +
+  ylab("NARR Daily Average Temperature (Celsius)") +
+  scale_x_continuous(limits = c(-30, 35), breaks = seq(-30, 35, by = 5), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(-30, 35), breaks = seq(-30, 35, by = 5), expand = c(0, 0)) +
+  stat_cor(method = "pearson", label.x = -28, r.digits = 3, p.accuracy = 0.01) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+# gridMET vs. NOAA
+sp_gridmet <- ggplot(noaa_stations_daymet_narr_gridmet, aes(x = tavg_noaa, y = tavg_gridmet)) +
+  geom_point(size = 0.75) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "blue") +
+  xlab("") +
+  ylab("gridMET Daily Average Temperature (Celsius)") +
   labs(caption = "Chicago, Illinois; 1 January 2017 - 30 December 2024; N = 8514") +
   scale_x_continuous(limits = c(-30, 35), breaks = seq(-30, 35, by = 5), expand = c(0, 0)) +
   scale_y_continuous(limits = c(-30, 35), breaks = seq(-30, 35, by = 5), expand = c(0, 0)) +
   stat_cor(method = "pearson", label.x = -28, r.digits = 3, p.accuracy = 0.01) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+# Scatterplot panel
+sp_daymet + sp_narr + sp_gridmet
 ```
 
 **Bland-Altman plot for Daymet vs. NOAA daily average temperature.**
@@ -153,7 +193,7 @@ ggplot(noaa_stations_daymet_narr, aes(x = tavg_noaa, y = tavg_daymet)) +
 ```{r}
 #| echo: false
 #| warning: false
-p <- blandr.draw(noaa_stations_daymet_narr$tavg_noaa, noaa_stations_daymet_narr$tavg_daymet, ciDisplay = FALSE, ciShading = FALSE) +
+p <- blandr.draw(noaa_stations_daymet_narr_gridmet$tavg_noaa, noaa_stations_daymet_narr_gridmet$tavg_daymet, ciDisplay = FALSE, ciShading = FALSE) +
   xlab("Mean of NOAA and Daymet Daily Average Temperature (Celsius)") +
   ylab("Difference between NOAA and Daymet\nDaily Average Temperature (Celsius)") +
   labs(caption = "Chicago, Illinois; 1 January 2017 - 30 December 2024; N = 8514", title = "") +
@@ -168,30 +208,34 @@ p_build$data[[5]][["colour"]] <- "red"
 grid::grid.draw(ggplot_gtable(p_build))
 ```
 
-**Scatterplot for NARR vs. NOAA daily average temperature.**
-
-```{r}
-#| echo: false
-ggplot(noaa_stations_daymet_narr, aes(x = tavg_noaa, y = tavg_narr)) +
-  geom_point(size = 0.75) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "blue") +
-  xlab("NOAA Daily Average Temperature (Celsius)") +
-  ylab("NARR Daily Average Temperature (Celsius)") +
-  labs(caption = "Chicago, Illinois; 1 January 2017 - 30 December 2024; N = 8514") +
-  scale_x_continuous(limits = c(-30, 35), breaks = seq(-30, 35, by = 5), expand = c(0, 0)) +
-  scale_y_continuous(limits = c(-30, 35), breaks = seq(-30, 35, by = 5), expand = c(0, 0)) +
-  stat_cor(method = "pearson", label.x = -28, r.digits = 3, p.accuracy = 0.01) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
-```
-
 **Bland-Altman plot for NARR vs. NOAA daily average temperature.**
 
 ```{r}
 #| echo: false
 #| warning: false
-p <- blandr.draw(noaa_stations_daymet_narr$tavg_noaa, noaa_stations_daymet_narr$tavg_narr, ciDisplay = FALSE, ciShading = FALSE) +
+p <- blandr.draw(noaa_stations_daymet_narr_gridmet$tavg_noaa, noaa_stations_daymet_narr_gridmet$tavg_narr, ciDisplay = FALSE, ciShading = FALSE) +
   xlab("Mean of NOAA and NARR Daily Average Temperature (Celsius)") +
   ylab("Difference between NOAA and NARR\nDaily Average Temperature (Celsius)") +
+  labs(caption = "Chicago, Illinois; 1 January 2017 - 30 December 2024; N = 8514", title = "") +
+  scale_x_continuous(limits = c(-30, 35), breaks = seq(-30, 35, by = 5), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(-15, 15), breaks = seq(-15, 15, by = 5), expand = c(0, 0)) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+p_build <- ggplot_build(p)
+p_build$data[[3]][["colour"]] <- "blue"
+p_build$data[[4]][["colour"]] <- "red"
+p_build$data[[5]][["colour"]] <- "red"
+grid::grid.draw(ggplot_gtable(p_build))
+```
+
+**Bland-Altman plot for gridMET vs. NOAA daily average temperature.**
+
+```{r}
+#| echo: false
+#| warning: false
+p <- blandr.draw(noaa_stations_daymet_narr_gridmet$tavg_noaa, noaa_stations_daymet_narr_gridmet$tavg_gridmet, ciDisplay = FALSE, ciShading = FALSE) +
+  xlab("Mean of NOAA and gridMET Daily Average Temperature (Celsius)") +
+  ylab("Difference between NOAA and gridMET\nDaily Average Temperature (Celsius)") +
   labs(caption = "Chicago, Illinois; 1 January 2017 - 30 December 2024; N = 8514", title = "") +
   scale_x_continuous(limits = c(-30, 35), breaks = seq(-30, 35, by = 5), expand = c(0, 0)) +
   scale_y_continuous(limits = c(-15, 15), breaks = seq(-15, 15, by = 5), expand = c(0, 0)) +

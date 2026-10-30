@@ -43,20 +43,6 @@ centroids_wide <- centroids_wide %>%
 centroids_s2cd <- as_s2cd(centroids_wide)
 rm(centroids_wide)
 
-# Linking in NARR air temperature data
-centroids_narr <- get_narr_data(centroids_s2cd, narr_var = "air.2m")
-
-# Transposing the NARR air temperature data
-for (i in 1:length(centroids_narr)) {
-  centroids_narr_df <- as.data.frame(centroids_narr[i])
-  centroids_narr_df <- as.data.frame(t(centroids_narr_df))
-  centroids_narr_df <- rownames_to_column(centroids_narr_df, var = "s2_cell")
-  centroids_narr_df <- centroids_narr_df %>%
-    rename_with(~ gsub("^V", "narr", .x))
-  assign(paste0("narr_", i), centroids_narr_df)
-}
-rm(centroids_narr_df, i, centroids_narr)
-
 # Linking in gridMET surface temperature data
 centroids_gridmet_tmmx <- get_gridmet_data(centroids_s2cd, gridmet_var = "tmmx")
 centroids_gridmet_tmmn <- get_gridmet_data(centroids_s2cd, gridmet_var = "tmmn")
@@ -81,20 +67,6 @@ for (i in 1:length(centroids_gridmet_tmmn)) {
   assign(paste0("gridmet_tmmn_", i), centroids_gridmet_df)
 }
 rm(centroids_gridmet_df, i, centroids_gridmet_tmmn)
-
-# Processing the NARR air temperature data for a merge with the census tract centroids
-centroids_narr <- bind_rows(mget(ls(pattern = "^narr_")))
-rm(list = ls(pattern = "^narr_[0-9]"))
-centroids_narr$s2_cell <- str_remove_all(centroids_narr$s2_cell, "^X")
-centroids_narr <- centroids_narr %>%
-  pivot_longer(
-    cols = starts_with("narr"),
-    names_to = "var",
-    values_to = "narr")
-centroids_narr$var <- str_remove_all(centroids_narr$var, "narr")
-centroids_narr$var <- as.integer(centroids_narr$var)
-centroids_narr <- centroids_narr %>%
-  filter(!is.na(narr))
 
 # Processing the gridMET surface temperature data for a merge with the census tract centroids
 centroids_gridmet_tmmx <- bind_rows(mget(ls(pattern = "^gridmet_tmmx_")))
@@ -122,19 +94,17 @@ centroids_gridmet_tmmn$var <- as.integer(centroids_gridmet_tmmn$var)
 centroids_gridmet_tmmn <- centroids_gridmet_tmmn %>%
   filter(!is.na(gridmet_tmmn))
 
-# Merging the NARR and gridMET temperature data with the census tract centroids
+# Merging the gridMET temperature data with the census tract centroids
 centroids$s2_cell <- as.character(centroids$s2_cell)
-centroids_narr_gridmet <- centroids %>%
-  inner_join(centroids_narr, by = c("s2_cell", "var")) %>%
+centroids_gridmet <- centroids %>%
   inner_join(centroids_gridmet_tmmx, by = c("s2_cell", "var")) %>%
   inner_join(centroids_gridmet_tmmn, by = c("s2_cell", "var"))
-rm(centroids, centroids_narr, centroids_gridmet_tmmx, centroids_gridmet_tmmn)
-centroids_narr_gridmet <- centroids_narr_gridmet %>%
+rm(centroids, centroids_gridmet_tmmx, centroids_gridmet_tmmn)
+centroids_gridmet <- centroids_gridmet %>%
   select(-c(s2_cell, var))
-centroids_narr_gridmet <- centroids_narr_gridmet %>%
-  rename(tavg_narr = narr,
-         tmax_gridmet = gridmet_tmmx,
+centroids_gridmet <- centroids_gridmet %>%
+  rename(tmax_gridmet = gridmet_tmmx,
          tmin_gridmet = gridmet_tmmn)
 
-# Writing the linked NARR and gridMET temperature data data out
-write_csv(centroids_narr_gridmet, "centroids_narr_gridmet.csv")
+# Writing the linked gridMET temperature data data out
+write_csv(centroids_gridmet, "centroids_gridmet.csv")
